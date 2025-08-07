@@ -1,0 +1,14 @@
+[project]
+name = "enhance-process"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.2.1",
+    "deepfilternet>=0.5.6",
+    "joblib>=1.5.1",
+    "librosa>=0.11.0",
+    "torch>=2.8.0",
+    "torchaudio>=2.8.0",
+]

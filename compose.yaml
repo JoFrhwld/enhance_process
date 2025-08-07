@@ -1,0 +1,6 @@
+services:
+  enhanceprocess:
+    image: enhanceprocess
+    build:
+      context: .
+      dockerfile: ./Dockerfile
