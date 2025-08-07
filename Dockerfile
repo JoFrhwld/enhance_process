@@ -42,5 +42,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ENV PATH="/app/.venv/bin:$PATH"
 RUN git init
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-ENTRYPOINT ["uv", "run", "main.py"]
+#ENTRYPOINT ["uv", "run", "main.py"]
 #ENTRYPOINT [ "deepFilter"]
