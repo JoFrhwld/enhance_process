@@ -39,6 +39,8 @@ ENV PYTHONUNBUFFERED=1
 COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
-
+ENV PATH="/app/.venv/bin:$PATH"
+RUN git init
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
 ENTRYPOINT ["uv", "run", "main.py"]
+#ENTRYPOINT [ "deepFilter"]
