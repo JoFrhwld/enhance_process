@@ -7,8 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
     "deepfilternet>=0.5.6",
-    "joblib>=1.5.1",
     "librosa>=0.11.0",
     "torch>=2.8.0",
     "torchaudio>=2.8.0",
+    "tqdm>=4.67.1",
 ]

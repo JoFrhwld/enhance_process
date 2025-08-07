@@ -4,7 +4,8 @@ COPY --from=ghcr.io/aghcr.io/astral-sh/uv:0.8.6 /uv /uvx /bin/
 
 RUN apt-get update && apt-get install -y \
   curl \
-  build-essential
+  build-essential \
+  git
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
@@ -38,6 +39,8 @@ ENV PYTHONUNBUFFERED=1
 COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
-
+ENV PATH="/app/.venv/bin:$PATH"
+RUN git init
 # During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
 ENTRYPOINT ["uv", "run", "main.py"]
+#ENTRYPOINT [ "deepFilter"]
