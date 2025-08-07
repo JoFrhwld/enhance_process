@@ -4,7 +4,8 @@ COPY --from=ghcr.io/aghcr.io/astral-sh/uv:0.8.6 /uv /uvx /bin/
 
 RUN apt-get update && apt-get install -y \
   curl \
-  build-essential
+  build-essential \
+  git
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
