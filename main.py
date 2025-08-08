@@ -15,6 +15,7 @@ import numpy.typing as npt
 from joblib import Parallel, delayed, cpu_count
 from pathlib import Path
 from tqdm import tqdm
+from functools import reduce
 
 
 
@@ -111,18 +112,13 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
     NFRAMES = enhanced.shape[1]
     hann = librosa.filters.get_window("hann", Nx = FRAME).reshape((-1, 1))
     enhanced = enhanced * hann
-    out_mat = np.empty((FRAME, FRAME + (HOP * (NFRAMES-1))))
-    out_mat[:] = np.nan
-    logger.info("Filling matrix")
-    for i in range(enhanced.shape[1]):
-        idx = int(i * HOP)
-        end_idx = idx + FRAME
-        out_mat[
-            i,
-            idx:end_idx
-        ] = enhanced[:,i]
-    logger.info("Normalizing")
-    out_arr = np.nansum(out_mat, axis = 0)
+    def red(a, b):
+        a1 = np.pad(a, (0,HOP))
+        b1 = np.pad(b,(a.size - b.size + HOP, 0))
+        return a1+b1
+    logger.info("reducing frames")
+    out_arr = reduce(red, enhanced.T)
+    out_arr = librosa.util.normalize(out_arr)
     soundfile.write(file = str(out_path), data = out_arr, samplerate=SR)
     logger.info("Sound written")
 
