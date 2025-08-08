@@ -1,3 +1,10 @@
+import logging
+import warnings
+
+warnings.filterwarnings(
+    action='ignore'
+)
+
 import click
 import librosa
 from df import enhance, init_df
@@ -8,25 +15,29 @@ import numpy.typing as npt
 from joblib import Parallel, delayed, cpu_count
 from pathlib import Path
 from tqdm import tqdm
-import logging
-import warnings
 
-warnings.filterwarnings(
-    action='ignore',
-    category=UserWarning
-)
+
 
 logger = logging.getLogger("enhance")
-logging.basicConfig(level = logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logger.handlers.clear()
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 logger.info("Initial setup")
 MODEL, DF_STATE, _ = init_df(log_level="DEBUG")
+SR = DF_STATE.sr()
+FRAME = 38400
+HOP = 19200
 NCPU = int(cpu_count()/2)
 
 def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Tensor:
     logger.info("Loading and framing audio")
     audio, sr = librosa.load(str(path), sr = df_state.sr())
-    audio_framed = librosa.util.frame(audio, frame_length=int(sr), hop_length=int(sr))
+    audio_framed = librosa.util.frame(audio, frame_length=FRAME, hop_length=HOP)
+    logger.info(f"Audio shape: {audio_framed.shape}")
 
     def get_perc(y:npt.NDArray)->npt.NDArray:
         return librosa.effects.percussive(y)
@@ -53,15 +64,32 @@ def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Ten
 def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_STATE)->npt.NDArray:
     logger.info("Starting Enhancement")
     results = [
-        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx], atten_lim_db=atten_db).numpy()
+        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx], atten_lim_db=atten_db).numpy().squeeze()
         for idx in tqdm(range(audio_t.shape[-1]), bar_format='{desc}: {percentage:3.0f}%')
     ]
-    enhanced = np.array(results).T.reshape(-1, order = "F")
+    enhanced = np.array(results).T
+    logger.info(f"Enhanced shape: {enhanced.shape}")
     return enhanced
 
 def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
     logger.info("Writing Audio")
-    soundfile.write(file = str(out_path), data = enhanced, samplerate=DF_STATE.sr())
+    NFRAMES = enhanced.shape[1]
+    hann = librosa.filters.get_window("hann", Nx = FRAME).reshape((-1, 1))
+    enhanced = enhanced * hann
+    out_mat = np.empty((FRAME, FRAME + (HOP * (NFRAMES-1))))
+    out_mat[:] = np.nan
+    logger.info("Filling matrix")
+    for i in range(enhanced.shape[1]):
+        idx = int(i * HOP)
+        end_idx = idx + FRAME
+        out_mat[
+            i,
+            idx:end_idx
+        ] = enhanced[:,i]
+    logger.info("Normalizing")
+    out_arr = np.nansum(out_mat, axis = 0)
+    soundfile.write(file = str(out_path), data = out_arr, samplerate=SR)
+    logger.info("Sound written")
 
 @click.command()
 @click.argument(
@@ -98,4 +126,5 @@ def main(path:Path, perc_damp, atten_db):
     write_audio(audio_e, str(out_file))
 
 if __name__ == "__main__":
+
     main()
