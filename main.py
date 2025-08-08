@@ -15,6 +15,7 @@ import numpy.typing as npt
 from joblib import Parallel, delayed, cpu_count
 from pathlib import Path
 from tqdm import tqdm
+from functools import reduce
 
 
 
@@ -34,6 +35,22 @@ HOP = 19200
 NCPU = int(cpu_count()/2)
 
 def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Tensor:
+    """This will
+    1. load and resample a targeted audio file
+    2. Split it up into frames
+    3. Get the percussive portion of the audio (mic hits)
+    4. Dampen those percussives
+    5. Raise the overall amplitude
+    6. Return the result as a tensor
+
+    Args:
+        path (Path | str): _description_
+        perc_damp (float): _description_
+        df_state (_type_, optional): _description_. Defaults to DF_STATE.
+
+    Returns:
+        Tensor: _description_
+    """
     logger.info("Loading and framing audio")
     audio, sr = librosa.load(str(path), sr = df_state.sr())
     audio_framed = librosa.util.frame(audio, frame_length=FRAME, hop_length=HOP)
@@ -62,6 +79,18 @@ def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Ten
 
 
 def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_STATE)->npt.NDArray:
+    """
+    This will apply the DeepFilterNet model to the audio frames
+
+    Args:
+        audio_t (Tensor): _description_
+        atten_db (float): _description_
+        model (_type_, optional): _description_. Defaults to MODEL.
+        df_state (_type_, optional): _description_. Defaults to DF_STATE.
+
+    Returns:
+        npt.NDArray: _description_
+    """
     logger.info("Starting Enhancement")
     results = [
         enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx], atten_lim_db=atten_db).numpy().squeeze()
@@ -72,22 +101,24 @@ def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_
     return enhanced
 
 def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
+    """
+    This will take the audio frames and write to a wav file.
+
+    Args:
+        enhanced (npt.NDArray): _description_
+        out_path (Path | str): _description_
+    """
     logger.info("Writing Audio")
     NFRAMES = enhanced.shape[1]
     hann = librosa.filters.get_window("hann", Nx = FRAME).reshape((-1, 1))
     enhanced = enhanced * hann
-    out_mat = np.empty((FRAME, FRAME + (HOP * (NFRAMES-1))))
-    out_mat[:] = np.nan
-    logger.info("Filling matrix")
-    for i in range(enhanced.shape[1]):
-        idx = int(i * HOP)
-        end_idx = idx + FRAME
-        out_mat[
-            i,
-            idx:end_idx
-        ] = enhanced[:,i]
-    logger.info("Normalizing")
-    out_arr = np.nansum(out_mat, axis = 0)
+    def red(a, b):
+        a1 = np.pad(a, (0,HOP))
+        b1 = np.pad(b,(a.size - b.size + HOP, 0))
+        return a1+b1
+    logger.info("reducing frames")
+    out_arr = reduce(red, enhanced.T)
+    out_arr = librosa.util.normalize(out_arr)
     soundfile.write(file = str(out_path), data = out_arr, samplerate=SR)
     logger.info("Sound written")
 
@@ -114,7 +145,7 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
     ),
     default = 30
 )
-def main(path:Path, perc_damp, atten_db):
+def main(path:Path, perc_damp, atten_db)->None:
     loc = path.parent
     out = loc.joinpath("enhanced")
     if not out.exists():
