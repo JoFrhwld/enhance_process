@@ -50,8 +50,6 @@ def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Ten
     audio, sr = librosa.load(str(path), sr = df_state.sr())
     logger.info(f"Audio duration {(audio.size/sr):.3} at a {sr} sampling rate")
     audio_framed = librosa.util.frame(audio, frame_length=FRAME, hop_length=HOP)
-    logger.info(f"audio dtype: {audio_framed.dtype}")
-    logger.info(f"audio dtype: {audio_framed.dtype}")    
     logger.info(f"Audio shape: {audio_framed.shape}")
 
     def get_perc(y:npt.NDArray)->npt.NDArray:
