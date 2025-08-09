@@ -110,14 +110,17 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
     """
     logger.info("Writing Audio")
     NFRAMES = enhanced.shape[1]
-    hann = librosa.filters.get_window("hann", Nx = FRAME).reshape((-1, 1))
-    enhanced = enhanced * hann
-    def red(a, b):
-        a1 = np.pad(a, (0,HOP))
-        b1 = np.pad(b,(a.size - b.size + HOP, 0))
-        return a1+b1
+
+    out_arr = np.empty((FRAME + ((NFRAMES-1)*HOP)))
+
     logger.info("reducing frames")
-    out_arr = reduce(red, enhanced.T)
+
+    for i in tqdm(np.arange(NFRAMES)):
+        start = HOP*i
+        end = start + FRAME
+        out_arr[start:end] += enhanced[:,i]
+
+ 
     out_arr = librosa.util.normalize(out_arr)
     soundfile.write(file = str(out_path), data = out_arr, samplerate=SR)
     logger.info("Sound written")
@@ -143,7 +146,7 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
         max = 100,
         clamp = True
     ),
-    default = 30
+    default = 25
 )
 def main(path:Path, perc_damp, atten_db)->None:
     loc = path.parent
