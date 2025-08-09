@@ -17,15 +17,10 @@ from pathlib import Path
 from tqdm import tqdm
 from functools import reduce
 
+from enhance.logging import make_loggers, make_file_handler
 
-
-logger = logging.getLogger("enhance")
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logger.handlers.clear()
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = make_loggers("enhance")
+logging.basicConfig(level=logging.INFO)
 
 logger.info("Initial setup")
 MODEL, DF_STATE, _ = init_df(log_level="DEBUG")
@@ -53,11 +48,14 @@ def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Ten
     """
     logger.info("Loading and framing audio")
     audio, sr = librosa.load(str(path), sr = df_state.sr())
+    logger.info(f"Audio duration {(audio.size/sr):.3} at a {sr} sampling rate")
     audio_framed = librosa.util.frame(audio, frame_length=FRAME, hop_length=HOP)
+    logger.info(f"audio dtype: {audio_framed.dtype}")
+    logger.info(f"audio dtype: {audio_framed.dtype}")    
     logger.info(f"Audio shape: {audio_framed.shape}")
 
     def get_perc(y:npt.NDArray)->npt.NDArray:
-        return librosa.effects.percussive(y)
+        return librosa.effects.percussive(y, margin=5)
 
     logger.info("Dampening percussives")    
     results = Parallel(n_jobs=NCPU)(
@@ -111,6 +109,8 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
     logger.info("Writing Audio")
     NFRAMES = enhanced.shape[1]
 
+    window = librosa.filters.get_window("hann", Nx = FRAME).reshape(-1,1).astype(np.float32)
+    enhanced = enhanced * window
     out_arr = np.empty((FRAME + ((NFRAMES-1)*HOP)))
 
     logger.info("reducing frames")
@@ -151,6 +151,11 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
 def main(path:Path, perc_damp, atten_db)->None:
     loc = path.parent
     out = loc.joinpath("enhanced")
+    logpath = out.joinpath(path.name)
+    fhandler = make_file_handler(logpath)
+    logger.addHandler(fhandler)
+    logger.info(f"Using perc_damp={perc_damp}")
+    logger.info(f"Ussing atten_db={atten_db}")
     if not out.exists():
         logger.info(f"Creating ouput directory at {str(out)}")
         out.mkdir(parents=True)
@@ -158,6 +163,7 @@ def main(path:Path, perc_damp, atten_db)->None:
     audio_t = load_and_process(str(path), perc_damp = perc_damp)
     audio_e = enhance_audio(audio_t, atten_db = atten_db)
     write_audio(audio_e, str(out_file))
+    logger.removeHandler(fhandler)
 
 if __name__ == "__main__":
 
