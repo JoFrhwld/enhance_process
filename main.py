@@ -9,6 +9,7 @@ import click
 import librosa
 from df import enhance, init_df
 import soundfile
+import torch
 from torch import tensor, Tensor
 import numpy as np
 import numpy.typing as npt
@@ -20,14 +21,16 @@ from functools import reduce
 from enhance.logging import make_loggers, make_file_handler
 
 logger = make_loggers("enhance")
-logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
 
 logger.info("Initial setup")
 MODEL, DF_STATE, _ = init_df(log_level="DEBUG")
 SR = DF_STATE.sr()
 FRAME = 38400
 HOP = 19200
-NCPU = int(cpu_count()/2)
+NCPU = int(cpu_count())
+dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 def load_and_process(path:Path|str, perc_damp:float, df_state = DF_STATE) -> Tensor:
     """This will
@@ -89,7 +92,7 @@ def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_
     """
     logger.info("Starting Enhancement")
     results = [
-        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx], atten_lim_db=atten_db).numpy().squeeze()
+        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx].to(dev), atten_lim_db=atten_db).numpy().squeeze()
         for idx in tqdm(range(audio_t.shape[-1]), bar_format='{desc}: {percentage:3.0f}%')
     ]
     enhanced = np.array(results).T
