@@ -92,7 +92,7 @@ def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_
     """
     logger.info("Starting Enhancement")
     results = [
-        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx].to(dev), atten_lim_db=atten_db).numpy().squeeze()
+        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx].to(dev), atten_lim_db=atten_db).cpu().numpy().squeeze()
         for idx in tqdm(range(audio_t.shape[-1]), bar_format='{desc}: {percentage:3.0f}%')
     ]
     enhanced = np.array(results).T
@@ -152,14 +152,14 @@ def write_audio(enhanced:npt.NDArray, out_path:Path|str)->None:
 def main(path:Path, perc_damp, atten_db)->None:
     loc = path.parent
     out = loc.joinpath("enhanced")
+    if not out.exists():
+        logger.info(f"Creating ouput directory at {str(out)}")
+        out.mkdir(parents=True)
     logpath = out.joinpath(path.name)
     fhandler = make_file_handler(logpath)
     logger.addHandler(fhandler)
     logger.info(f"Using perc_damp={perc_damp}")
     logger.info(f"Ussing atten_db={atten_db}")
-    if not out.exists():
-        logger.info(f"Creating ouput directory at {str(out)}")
-        out.mkdir(parents=True)
     out_file = out.joinpath(path.name)
     audio_t = load_and_process(str(path), perc_damp = perc_damp)
     audio_e = enhance_audio(audio_t, atten_db = atten_db)
