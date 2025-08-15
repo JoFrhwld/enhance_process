@@ -92,7 +92,7 @@ def enhance_audio(audio_t:Tensor, atten_db: float, model = MODEL, df_state = DF_
     """
     logger.info("Starting Enhancement")
     results = [
-        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx].to(dev), atten_lim_db=atten_db).numpy().squeeze()
+        enhance(model = MODEL, df_state=DF_STATE, audio = audio_t[:,:,idx].to(dev), atten_lim_db=atten_db).cpu().numpy().squeeze()
         for idx in tqdm(range(audio_t.shape[-1]), bar_format='{desc}: {percentage:3.0f}%')
     ]
     enhanced = np.array(results).T
